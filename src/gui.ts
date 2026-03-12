@@ -3,11 +3,13 @@ import GUI from 'lil-gui';
 export const guiState = {
     targetAngle: 0,
     currentAngle: 0,
-    speed: 20, // 0-100 开合速度
+    speed: 20, // 开合速度
+    moveSpeed: 5, // 0-20 移动速度
     showDebugLines: true, // 是否显示物理辅助线
     posX: 0,
     posY: 0,
-    posZ: 0
+    posZ: 0,
+    moveDir: { x: 0, y: 0, z: 0 } // 当前按键产生的移动方向向量
 };
 
 export function initGUI() {
@@ -25,9 +27,39 @@ export function initGUI() {
     actionFolder.add(guiState, 'showDebugLines').name('物理调试线');
 
     const posFolder = gui.addFolder('机械爪位置');
-    posFolder.add(guiState, 'posX', -10, 10).name('X 位置').step(0.1);
-    posFolder.add(guiState, 'posY', -10, 10).name('Y 位置').step(0.1);
-    posFolder.add(guiState, 'posZ', -10, 10).name('Z 位置').step(0.1);
+    posFolder.add(guiState, 'moveSpeed', 0.1, 20).name('移动速度').step(0.1);
+    posFolder.add(guiState, 'posX', -10, 10).name('X 位置').step(0.1).listen();
+    posFolder.add(guiState, 'posY', -10, 10).name('Y 位置').step(0.1).listen();
+    posFolder.add(guiState, 'posZ', -10, 10).name('Z 位置').step(0.1).listen();
+
+    // 键盘监听逻辑：按下增加方向速度，松开方向归零
+    const keyMap = { w: false, s: false, a: false, d: false, q: false, e: false };
+
+    const updateMoveDir = () => {
+        guiState.moveDir.x = (keyMap.d ? 1 : 0) - (keyMap.a ? 1 : 0);
+        guiState.moveDir.y = (keyMap.q ? 1 : 0) - (keyMap.e ? 1 : 0);
+        guiState.moveDir.z = (keyMap.s ? 1 : 0) - (keyMap.w ? 1 : 0);
+    };
+
+    window.addEventListener('keydown', (event) => {
+        const key = event.key.toLowerCase();
+        if (key in keyMap) {
+            keyMap[key as keyof typeof keyMap] = true;
+            updateMoveDir();
+        } else if (key === '[') {
+            actions.close();
+        } else if (key === ']') {
+            actions.open();
+        }
+    });
+
+    window.addEventListener('keyup', (event) => {
+        const key = event.key.toLowerCase();
+        if (key in keyMap) {
+            keyMap[key as keyof typeof keyMap] = false;
+            updateMoveDir();
+        }
+    });
 
     return gui;
 }

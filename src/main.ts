@@ -83,8 +83,15 @@ async function main() {
     function animate() {
         requestAnimationFrame(animate);
 
+        // 计算基于帧率的速度积分（这里用固定系数 0.016 简化约等 60fps，也可以引入 THREE.Clock）
+        const deltaTime = 0.016; 
+        
+        guiState.posX += guiState.moveDir.x * guiState.moveSpeed * deltaTime;
+        guiState.posY += guiState.moveDir.y * guiState.moveSpeed * deltaTime;
+        guiState.posZ += guiState.moveDir.z * guiState.moveSpeed * deltaTime;
+
         if (gripper) {
-            // gripper.scene.position.set(guiState.posX, guiState.posY, guiState.posZ);
+            gripper.scene.position.set(0 + guiState.posX, 2 + guiState.posY, 0 + guiState.posZ);
         }
 
         // a. 更新主动件 tie 的变换
@@ -102,9 +109,19 @@ async function main() {
             }
 
             const rad = (guiState.currentAngle * Math.PI) / 180;
-            // 控制 tie 绕着其局部 Y 轴旋转，从而作为主动件驱动整个机械爪运动
-            physics.setPartKinematicRotation(gripper.parts.left.tie, new THREE.Euler(0, rad, 0));
-            physics.setPartKinematicRotation(gripper.parts.right.tie, new THREE.Euler(0, -rad, 0));
+            const offset = new THREE.Vector3(guiState.posX, guiState.posY, guiState.posZ);
+            
+            // 控制 tie 绕着其局部 Y 轴旋转，加上物理世界的整体偏移绑定
+            physics.setPartKinematicState(gripper.parts.left.tie, new THREE.Euler(0, rad, 0), offset);
+            physics.setPartKinematicState(gripper.parts.right.tie, new THREE.Euler(0, -rad, 0), offset);
+            
+            // 同步移动负责支撑的隐形地基锚点
+            physics.setGripperTranslation(offset);
+            
+            // 同步移动外壳(case/base)等没被额外驱动但必须参与运动学更新的刚体
+            if (gripper.parts.base) {
+                physics.setPartKinematicState(gripper.parts.base, new THREE.Euler(0, 0, 0), offset);
+            }
         }
 
         // b. 步进物理世界

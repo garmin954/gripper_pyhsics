@@ -65,6 +65,8 @@ export class PhysicsWorld {
     public world: RAPIER.World;
     public partRigidBodies: Map<THREE.Object3D, RAPIER.RigidBody> = new Map();
     public initialRotations: Map<THREE.Object3D, THREE.Quaternion> = new Map();
+    public initialTranslations: Map<THREE.Object3D, THREE.Vector3> = new Map();
+    public baseRigidBodies: { rb: RAPIER.RigidBody, initialPos: THREE.Vector3 }[] = [];
 
     constructor() {
         // 重力设为很小或者 0，以便观察纯机械逻辑
@@ -104,6 +106,7 @@ export class PhysicsWorld {
             const rb = this.world.createRigidBody(rbDesc);
             this.partRigidBodies.set(part, rb);
             this.initialRotations.set(part, quaternion.clone());
+            this.initialTranslations.set(part, position.clone());
 
             // 提取顶点并创建 Trimesh
             const meshData = getLocalVertices(part);
@@ -197,10 +200,11 @@ export class PhysicsWorld {
         // 否则物理引擎启动的第一帧，它会发现一个向上一个向前，两根不同的销钉轴被强制合一，从而产生摧毁性的扭力把整个零件扯碎！
         const supportQuatWorld = support.getWorldQuaternion(new THREE.Quaternion());
         const rbSupportFixed = this.world.createRigidBody(
-            RAPIER.RigidBodyDesc.fixed()
+            RAPIER.RigidBodyDesc.kinematicPositionBased() // 因为必须允许玩家移动，将其从 fixed 改为 kinematicPositionBased
                 .setTranslation(supportCenterWorld.x, supportCenterWorld.y, supportCenterWorld.z)
                 .setRotation({ x: supportQuatWorld.x, y: supportQuatWorld.y, z: supportQuatWorld.z, w: supportQuatWorld.w })
         );
+        this.baseRigidBodies.push({ rb: rbSupportFixed, initialPos: supportCenterWorld.clone() });
         this.world.createImpulseJoint(
             RAPIER.JointData.revolute(supportAnchorFixed, { x: 0, y: 0, z: 0 }, YAXIS),
             rbSupport,
@@ -225,18 +229,33 @@ export class PhysicsWorld {
         );
     }
 
-    public setPartKinematicRotation(part: THREE.Object3D, eulerOffset: THREE.Euler) {
+    public setGripperTranslation(offset: THREE.Vector3) {
+        // 同步所有负责充当环境地基的锚点刚体
+        this.baseRigidBodies.forEach(({ rb, initialPos }) => {
+            const pos = initialPos.clone().add(offset);
+            rb.setNextKinematicTranslation(pos);
+        });
+    }
+
+    public setPartKinematicState(part: THREE.Object3D, eulerOffset: THREE.Euler, translationOffset: THREE.Vector3) {
         const rb = this.partRigidBodies.get(part);
         const initQuat = this.initialRotations.get(part);
+        const initPos = this.initialTranslations.get(part);
 
-        if (!rb || !initQuat) return;
+        if (!rb || !initQuat || !initPos) return;
 
         // 构建偏移旋转
         const offsetQuat = new THREE.Quaternion().setFromEuler(eulerOffset);
         // 在初始旋转的基础上进行局部旋转叠加
         const finalQuat = initQuat.clone().multiply(offsetQuat);
-
         rb.setNextKinematicRotation(finalQuat);
+
+        // 如果这个刚体并非纯物理掉落，而是由运动学驱动（如底座主动件和tie传动轴）
+        // 那我们必须一并根据坐标系偏移修改它的全局位置，防止位移错位
+        if (rb.bodyType() === RAPIER.RigidBodyType.KinematicPositionBased) {
+            const finalPos = initPos.clone().add(translationOffset);
+            rb.setNextKinematicTranslation(finalPos);
+        }
     }
 
     public step() {
