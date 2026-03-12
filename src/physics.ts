@@ -88,7 +88,8 @@ export class PhysicsWorld {
             if (!part) return;
 
             // 获取部件的世界坐标和旋转
-            part.updateMatrixWorld(true);
+            // 当场景有整体旋转时，我们需要将该旋转结果也合并到初始刚体的状态中
+            part.updateWorldMatrix(true, false);
             const position = new THREE.Vector3();
             const quaternion = new THREE.Quaternion();
             const scale = new THREE.Vector3();
@@ -192,8 +193,13 @@ export class PhysicsWorld {
         // ==========================
 
         // a. 将 Support 固定在底盘/空间中
+        // 【极其重要】外层场景旋转后，我们创建这个模拟固定在空中的隐形零件必须也要具有跟 support 一致的初始旋转！
+        // 否则物理引擎启动的第一帧，它会发现一个向上一个向前，两根不同的销钉轴被强制合一，从而产生摧毁性的扭力把整个零件扯碎！
+        const supportQuatWorld = support.getWorldQuaternion(new THREE.Quaternion());
         const rbSupportFixed = this.world.createRigidBody(
-            RAPIER.RigidBodyDesc.fixed().setTranslation(supportCenterWorld.x, supportCenterWorld.y, supportCenterWorld.z)
+            RAPIER.RigidBodyDesc.fixed()
+                .setTranslation(supportCenterWorld.x, supportCenterWorld.y, supportCenterWorld.z)
+                .setRotation({ x: supportQuatWorld.x, y: supportQuatWorld.y, z: supportQuatWorld.z, w: supportQuatWorld.w })
         );
         this.world.createImpulseJoint(
             RAPIER.JointData.revolute(supportAnchorFixed, { x: 0, y: 0, z: 0 }, YAXIS),

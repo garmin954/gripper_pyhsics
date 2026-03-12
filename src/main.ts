@@ -50,10 +50,17 @@ async function main() {
         if (!gripper) {
             throw new Error('模型加载失败');
         }
-        // gripper.scene.getObjectByName("case").visible = false;
 
-        // 创建该模型物理部分的刚体集
+        // 调整模型初始姿态：让爪头向下
+        // 这里可以通过旋转整个 scene 实现
+        gripper.scene.rotation.set(Math.PI / 2, 0, 0); // (0, 0, -Math.PI / 2) 可尝试
+
+        gripper.scene.position.set(0, 2, 0);
+        // 旋转之后，确保子节点的矩阵被正确更新，因为物理引擎会马上抓取它们的世界坐标
+        gripper.scene.updateMatrixWorld(true);
+
         scene.add(gripper.scene);
+
         physics.addGripperParts(gripper.parts);
 
     } catch (e) {
@@ -82,31 +89,61 @@ async function main() {
 
         // a. 更新主动件 tie 的变换
         if (gripper && gripper.parts.left.tie) {
-            const rad = (guiState.tieRotationY * Math.PI) / 180;
+            // 根据速度插值逼近目标角度
+            const diff = guiState.targetAngle - guiState.currentAngle;
+            if (Math.abs(diff) > 0.001) {
+                // speed 映射：数值 1-100 意味着每帧度数在一定范围内（例如 0.05 ~ 5 度）
+                const step = (guiState.speed / 100) * 5;
+                if (Math.abs(diff) <= step) {
+                    guiState.currentAngle = guiState.targetAngle;
+                } else {
+                    guiState.currentAngle += Math.sign(diff) * step;
+                }
+            }
+
+            const rad = (guiState.currentAngle * Math.PI) / 180;
             // 控制 tie 绕着其局部 Y 轴旋转，从而作为主动件驱动整个机械爪运动
             physics.setPartKinematicRotation(gripper.parts.left.tie, new THREE.Euler(0, rad, 0));
             physics.setPartKinematicRotation(gripper.parts.right.tie, new THREE.Euler(0, -rad, 0));
-
         }
 
         // b. 步进物理世界
         physics.step();
 
         // c. 更新调试辅助线
-        const buffers = physics.world.debugRender();
-        debugLines.geometry.setAttribute('position', new THREE.BufferAttribute(buffers.vertices, 3));
-        debugLines.geometry.setAttribute('color', new THREE.BufferAttribute(buffers.colors, 4));
+        if (guiState.showDebugLines) {
+            debugLines.visible = true;
+            const buffers = physics.world.debugRender();
+            debugLines.geometry.setAttribute('position', new THREE.BufferAttribute(buffers.vertices, 3));
+            debugLines.geometry.setAttribute('color', new THREE.BufferAttribute(buffers.colors, 4));
+        } else {
+            debugLines.visible = false;
+        }
 
         // d. 同步物理状态到视觉
         physics.partRigidBodies.forEach((rb, part) => {
             const p = rb.translation();
             const r = rb.rotation();
 
-            // 因为 RigidBody 的 translation 处于世界坐标下，而 part 是嵌套在 scene 中的，
-            // 假设 gripper.scene 没有发生过变换，那么可以直接赋值 part.position。
-            // 假如 gripper.scene 进行了平移旋转，在更复杂的应用中应该使用 worldToLocal，这里先简单按世界坐标处理
-            part.position.set(p.x, p.y, p.z);
-            part.quaternion.set(r.x, r.y, r.z, r.w);
+            // 因为 RigidBody 的 translation 处于世界坐标下，而 part 是嵌套在 gripper.scene（已被旋转）中的，
+            // 所以我们必须把物理引擎里纯净的世界坐标，逆向转换回 part 的父级坐标系中！
+            if (part.parent) {
+                // 1. 位置转换：世界坐标 -> 局部坐标
+                const worldPos = new THREE.Vector3(p.x, p.y, p.z);
+                part.parent.worldToLocal(worldPos);
+                part.position.copy(worldPos);
+
+                // 2. 旋转转换：世界旋转 -> 局部旋转
+                const worldQuat = new THREE.Quaternion(r.x, r.y, r.z, r.w);
+                const parentWorldQuat = new THREE.Quaternion();
+                part.parent.getWorldQuaternion(parentWorldQuat);
+                // 局部旋转 = 父级世界旋转的逆 * 自身世界旋转
+                const localQuat = parentWorldQuat.invert().multiply(worldQuat);
+                part.quaternion.copy(localQuat);
+            } else {
+                part.position.set(p.x, p.y, p.z);
+                part.quaternion.set(r.x, r.y, r.z, r.w);
+            }
         });
 
         controls.update();
