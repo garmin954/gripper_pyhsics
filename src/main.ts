@@ -4,6 +4,7 @@ import { initPhysics } from './physics';
 import { loadGripperModel } from './loader';
 import { initGUI, guiState, initControlsOverlay } from './gui';
 import './style.css'
+import gripperModelUrl from './assets/gripperg2.glb?url';
 
 async function main() {
     // 1. 初始化物理
@@ -56,7 +57,7 @@ async function main() {
     // 3. 加载 GLB 模型部件
     let gripper: any = null;
     try {
-        gripper = await loadGripperModel('src/assets/gripperg2.glb');
+        gripper = await loadGripperModel(gripperModelUrl);
         if (!gripper) {
             throw new Error('模型加载失败');
         }
