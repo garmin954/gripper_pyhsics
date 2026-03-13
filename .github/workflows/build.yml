@@ -1,24 +1,27 @@
-name: Build and Package
+name: Build and Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master" ]  # 推送到主分支时触发
   pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+    branches: [ "main", "master" ]  # PR到主分支时触发（可选，可删除）
+  workflow_dispatch:                # 支持手动触发
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        # 若需要访问历史提交（部分项目部署需要），添加fetch-depth
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -27,9 +30,23 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # 可选：上传打包产物（保留原有的 artifact 上传，方便调试）
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-output
           path: dist/
           retention-days: 7
+
+      # 核心步骤：部署到 GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4  # 成熟的 GitHub Pages 部署插件
+        with:
+          # GitHub 自动生成的 token，无需手动配置
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # 要部署的目录（对应打包后的 dist 目录）
+          publish_dir: ./dist
+          # 部署到 gh-pages 分支（默认，无需修改）
+          publish_branch: gh-pages
+          # 可选：部署前清空 gh-pages 分支的旧文件
+          force_orphan: true
