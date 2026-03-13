@@ -4,8 +4,8 @@ export const guiState = {
     targetAngle: 0,
     currentAngle: 0,
     speed: 20, // 开合速度
-    moveSpeed: 5, // 0-20 移动速度
-    showDebugLines: true, // 是否显示物理辅助线
+    moveSpeed: 2, // 0-20 移动速度
+    showDebugLines: false, // 是否显示物理辅助线
     posX: 0,
     posY: 0,
     posZ: 0,
@@ -27,7 +27,7 @@ export function initGUI() {
     actionFolder.add(guiState, 'showDebugLines').name('物理调试线');
 
     const posFolder = gui.addFolder('机械爪位置');
-    posFolder.add(guiState, 'moveSpeed', 0.1, 20).name('移动速度').step(0.1);
+    posFolder.add(guiState, 'moveSpeed', 0.1, 10).name('移动速度').step(0.1);
     posFolder.add(guiState, 'posX', -10, 10).name('X 位置').step(0.1).listen();
     posFolder.add(guiState, 'posY', -10, 10).name('Y 位置').step(0.1).listen();
     posFolder.add(guiState, 'posZ', -10, 10).name('Z 位置').step(0.1).listen();
@@ -61,5 +61,25 @@ export function initGUI() {
         }
     });
 
+
     return gui;
+}
+
+/**
+ * 初始化左上角的操作提示面板
+ */
+export function initControlsOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'controls-overlay';
+    overlay.innerHTML = `
+        <h3>操作指南</h3>
+        <div class="control-item"><span class="control-key">W</span><span class="control-key">S</span><span class="control-desc">前后移动</span></div>
+        <div class="control-item"><span class="control-key">A</span><span class="control-key">D</span><span class="control-desc">左右移动</span></div>
+        <div class="control-item"><span class="control-key">Q</span><span class="control-key">E</span><span class="control-desc">上下移动</span></div>
+        <div class="control-item"><span class="control-key">[</span><span class="control-key">]</span><span class="control-desc">夹爪闭合 / 打开</span></div>
+        <div class="control-item" style="margin-top: 12px; font-size: 11px; opacity: 0.6;">
+            <span>鼠标右键旋转视角 | 滚轮缩放</span>
+        </div>
+    `;
+    document.body.appendChild(overlay);
 }

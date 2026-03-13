@@ -94,3 +94,56 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* 操作提示面板样式 */
+.controls-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 16px;
+  background: rgba(30, 30, 30, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: white;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  pointer-events: none; /* 防止干扰点击 */
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease;
+}
+
+.controls-overlay h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #646cff;
+  border-bottom: 1px solid rgba(100, 108, 255, 0.3);
+  padding-bottom: 4px;
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.control-key {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-right: 10px;
+  min-width: 20px;
+  text-align: center;
+  font-family: monospace;
+  font-weight: bold;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.control-desc {
+  color: rgba(255, 255, 255, 0.8);
+}

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { initPhysics } from './physics';
 import { loadGripperModel } from './loader';
-import { initGUI, guiState } from './gui';
+import { initGUI, guiState, initControlsOverlay } from './gui';
+import './style.css'
 
 async function main() {
     // 1. 初始化物理
@@ -78,6 +79,7 @@ async function main() {
 
     // 5. GUI 控制
     initGUI();
+    initControlsOverlay();
 
     // 6. 物理调试渲染器
     const debugLines = new THREE.LineSegments(
@@ -120,11 +122,12 @@ async function main() {
             const rad = (guiState.currentAngle * Math.PI) / 180;
             const offset = new THREE.Vector3(guiState.posX, guiState.posY, guiState.posZ);
 
-            // 控制 tie 绕着其局部 Y 轴旋转，加上物理世界的整体偏移绑定
-            physics.setPartKinematicState(gripper.parts.left.tie, new THREE.Euler(0, rad, 0), offset);
-            physics.setPartKinematicState(gripper.parts.right.tie, new THREE.Euler(0, -rad, 0), offset);
+            // 【关键修改】不再直接设置 tie 的运动学状态旋转角度
+            // 而是通过电机控制其目标位置。物理引擎会自动处理碰撞阻力。
+            physics.setTieMotorTarget('left', -rad);
+            physics.setTieMotorTarget('right', rad);
 
-            // 同步移动负责支撑的隐形地基锚点
+            // 同步移动负责支撑的隐形地基轴/锚点 (同步平移)
             physics.setGripperTranslation(offset);
 
             // 同步移动外壳(case/base)等没被额外驱动但必须参与运动学更新的刚体
