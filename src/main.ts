@@ -12,7 +12,7 @@ async function main() {
 
     // 2. 初始化渲染器
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x202020);
+    scene.background = new THREE.Color(0xf0f4f8); // 改为明亮的浅灰蓝色
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 5, 5);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -21,25 +21,25 @@ async function main() {
 
     const controls = new OrbitControls(camera, renderer.domElement);
 
-    // 半球光：提供整体环境照明
-    const hemi = new THREE.HemisphereLight(0xbad7f0, 0x1d1a12, 0.65);
+    // 半球光：模拟天空和地面反射，提供整体基础亮度
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xbbbbbb, 1.0); // 增强基础亮度
     scene.add(hemi);
 
     // 坐标系
     const axesHelper = new THREE.AxesHelper(2);
     scene.add(axesHelper);
 
-    // 平行光：提供方向光与阴影
-    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-    dir.position.set(0, 10, 0);
+    // 平行光：模拟阳光，提供主光源和阴影
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5); // 增强主光源
+    dir.position.set(5, 15, 7.5); // 调整位置以获得更好的投影感
     dir.castShadow = true;
-    dir.shadow.mapSize.set(1024, 1024);
+    dir.shadow.mapSize.set(2048, 2048); // 提升阴影质量
     scene.add(dir);
 
     // ===== 地面（渲染） =====
     const ground = new THREE.Mesh(
         new THREE.BoxGeometry(20, 0.1, 20),
-        new THREE.MeshStandardMaterial({ color: 0x2a313d, metalness: 0.1, roughness: 0.9 }),
+        new THREE.MeshStandardMaterial({ color: 0xe5eaf0, metalness: 0.0, roughness: 0.8 }), // 调浅地面颜色
     );
 
     ground.position.setY(-0.1)
