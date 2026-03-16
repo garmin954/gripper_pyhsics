@@ -1,6 +1,7 @@
 import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { GripperParts } from './loader';
 import * as THREE from 'three';
+import { degToRad } from 'three/src/math/MathUtils.js';
 
 // 碰撞组定义：(membership << 16) | filter
 // 夹爪零件：属于 Group 1 (0x0002)，只与 Group 0 (0x0001) 发生碰撞，不与自己(Group 1)碰撞
@@ -79,7 +80,7 @@ export class PhysicsWorld {
 
         // 增大求解器迭代次数，让关节约束更精确、更"硬"
         // 将迭代次数提升至 128，极大增强关节在运动时的抗变形能力
-        this.world.numSolverIterations = 64;
+        this.world.numSolverIterations = 32;
         // 增加内部投影高斯-赛德尔（PGS）迭代次数，增强关节精度
         this.world.numInternalPgsIterations = 10;
 
@@ -221,12 +222,14 @@ export class PhysicsWorld {
                 .setRotation({ x: supportQuatWorld.x, y: supportQuatWorld.y, z: supportQuatWorld.z, w: supportQuatWorld.w })
         );
         this.baseRigidBodies.push({ rb: rbSupportFixed, initialPos: supportCenterWorld.clone() });
-        this.world.createImpulseJoint(
+        const jointSupportFixed = this.world.createImpulseJoint(
             RAPIER.JointData.revolute(supportAnchorFixed, { x: 0, y: 0, z: 0 }, YAXIS),
             rbSupport,
             rbSupportFixed,
             true
-        );
+        ) as RAPIER.RevoluteImpulseJoint;
+
+        jointSupportFixed.setLimits(side === "left" ? degToRad(-30) : 0, side === "left" ? 0 : degToRad(30))
 
         // 2. Splint 和 Support 连接
         this.world.createImpulseJoint(
@@ -237,12 +240,14 @@ export class PhysicsWorld {
         );
 
         // 3. Tie 和 Splint 连接
-        this.world.createImpulseJoint(
+        const jointTieSplint = this.world.createImpulseJoint(
             RAPIER.JointData.revolute(tieAnchorSplint, splintAnchorTie, YAXIS),
             rbTie,
             rbSplint,
             true
-        );
+        ) as RAPIER.RevoluteImpulseJoint;
+        jointTieSplint.setLimits(side === "left" ? degToRad(-30) : 0, side === "left" ? 0 : degToRad(30))
+
 
         // 4. 为 Tie 创建一个运动学驱动锚点 
         const tieQuatWorld = tie.getWorldQuaternion(new THREE.Quaternion());
@@ -259,6 +264,8 @@ export class PhysicsWorld {
             rbTieAnchor,
             true
         ) as RAPIER.RevoluteImpulseJoint;
+        jointTieToAnchor.setLimits(side === "left" ? degToRad(-30) : 0, side === "left" ? 0 : degToRad(30))
+
 
         // 这里就是主驱动电机！
         // 调整电机刚度：恢复至 8000.0，配合更多的 solver iterations 保证稳固
